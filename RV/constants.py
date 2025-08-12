@@ -19,7 +19,7 @@ PLOT_COLOR = '#fafafa'
 PRIMARY_BLUE = '#2bb1d6'
 BAD_CHANNEL_COLOR = '#eb4757'
 BAD_CHANNEL_DISAGREE_COLOR = 'sandybrown'
-ANNOTATION_COLOR_OPTIONS = ['red', 'blue', 'yellow', 'green', 'purple', 'turquoise']
+ANNOTATION_COLOR_OPTIONS = ['red', 'green', 'yellow', 'blue', 'purple', 'gray', 'turquoise']
 MODEL_CHANNEL_COLOR = PRIMARY_BLUE  # '#4DAA57'
 
 ##### Mapping of EGI-129 channels to brain lobes #####

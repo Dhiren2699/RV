@@ -23,8 +23,17 @@ def get_annotation_label_radioitem(annotation_label: str, color=None):
         dict: Dictionary with keys 'label' and 'value'.
     """
     if not color:
-        # random color if no color was given
-        color = random.choice(c.ANNOTATION_COLOR_OPTIONS)
+        # Default mapping for well-known labels
+        DEFAULT_LABEL_COLORS = {
+            'seizure': 'red',
+            'non-seizure': 'green',
+            'spike': 'yellow',
+            'muscle artifact': 'purple',
+            'eye blinks': 'blue',
+            'general artifact': 'gray',
+        }
+        normalized = annotation_label.lower()
+        color = DEFAULT_LABEL_COLORS.get(normalized, random.choice(c.ANNOTATION_COLOR_OPTIONS))
 
     annotation_label_dict = {
         'label':[

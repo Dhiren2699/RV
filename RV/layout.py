@@ -84,6 +84,19 @@ def get_RV_layout(load_file_path=os.path.join(CURRENT_PATH, 'data'), save_file_p
                                         # n_clicks=0,
                                         title="Shortcut: 'backspace'"
                                     ),
+                                    html.Div(className='aligned', style={'marginLeft': '8px'}, children=[
+                                        html.Span('Mark label:'),
+                                        dcc.Dropdown(
+                                            id='RV-active-annotation-label-dropdown',
+                                            className='small-dropdown',
+                                            options=[
+                                                {'label': 'bad_artifact', 'value': 'bad_artifact'},
+                                                {'label': 'seizures', 'value': 'seizures'}
+                                            ],
+                                            value='bad_artifact',
+                                            clearable=False,
+                                        )
+                                    ])
                                 ],
                             ),
                             html.Div(id='RV-bad-channel-buttons',
@@ -556,18 +569,57 @@ def get_RV_layout(load_file_path=os.path.join(CURRENT_PATH, 'data'), save_file_p
                                             placeholder='Select annotation files (.csv, .fif) to load...'
                                         )
                                     ]),
-                                    html.Div([
+                                    html.Div(style={'display': 'none'}, children=[
                                         html.Div([
                                             dcc.RadioItems(
                                                 id='RV-annotation-label',
                                                 options=
                                                     [
-                                                        get_annotation_label_radioitem('bad_artifact', 'red')[0],
+                                                        get_annotation_label_radioitem('seizure', 'red')[0],
+                                                        get_annotation_label_radioitem('non-seizure', 'green')[0],
+                                                        get_annotation_label_radioitem('spike', 'yellow')[0],
+                                                        get_annotation_label_radioitem('muscle artifact', 'purple')[0],
+                                                        get_annotation_label_radioitem('eye blinks', 'blue')[0],
+                                                        get_annotation_label_radioitem('general artifact', 'gray')[0],
                                                     ],
-                                                value='bad_artifact',
+                                                value='seizure',
                                                 labelStyle={'display': 'flex', 'flex-direction': 'row', 'vertical-align': 'middle'},
                                             )
                                         ]),
+                                        html.Div(style={'marginTop': '8px'}, children=[
+                                            dcc.RadioItems(
+                                                id='RV-annotation-label-2',
+                                                options=[
+                                                    {'label': 'None', 'value': 'None'},
+                                                    {'label': 'seizure', 'value': 'seizure'},
+                                                    {'label': 'non-seizure', 'value': 'non-seizure'},
+                                                    {'label': 'spike', 'value': 'spike'},
+                                                    {'label': 'muscle artifact', 'value': 'muscle artifact'},
+                                                    {'label': 'eye blinks', 'value': 'eye blinks'},
+                                                    {'label': 'general artifact', 'value': 'general artifact'},
+                                                ],
+                                                value='None',
+                                                labelStyle={'display': 'flex', 'flex-direction': 'row', 'vertical-align': 'middle'},
+                                            )
+                                        ]),
+                                    ]),
+                                    html.Div([
+                                        html.Div(style={'marginTop': '8px'}, children=[
+                                            html.Span('Enable labels for marking:'),
+                                        dcc.Checklist(
+                                                id='RV-enabled-annotation-labels',
+                                                inline=True,
+                                                options=[
+                                                    {'label': 'seizure', 'value': 'seizure'},
+                                                    {'label': 'non-seizure', 'value': 'non-seizure'},
+                                                    {'label': 'spike', 'value': 'spike'},
+                                                    {'label': 'muscle artifact', 'value': 'muscle artifact'},
+                                                    {'label': 'eye blinks', 'value': 'eye blinks'},
+                                                    {'label': 'general artifact', 'value': 'general artifact'},
+                                                ],
+                                                value=['seizure', 'non-seizure', 'spike', 'muscle artifact', 'eye blinks', 'general artifact']
+                                            )
+                                        ])
                                     ]),
                                     html.Div([
                                         dcc.Input(

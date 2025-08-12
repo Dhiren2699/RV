@@ -128,7 +128,13 @@ def register_annotation_callbacks():
                     annotation_end = plotting_data['recording_length']
                     refresh_needed = 1
 
-                marked_annotations.append((round(annotation_start, 3), round(annotation_end - annotation_start, 3), annotation_label))
+                # Support multi-label rectangles encoded as "label1|label2"
+                if isinstance(annotation_label, str) and '|' in annotation_label:
+                    split_labels = [lbl for lbl in annotation_label.split('|') if lbl]
+                    for lbl in split_labels:
+                        marked_annotations.append((round(annotation_start, 3), round(annotation_end - annotation_start, 3), lbl))
+                else:
+                    marked_annotations.append((round(annotation_start, 3), round(annotation_end - annotation_start, 3), annotation_label))
 
         if len(marked_annotations) > 1:
             marked_annotations, merge_happened = merge_annotations(marked_annotations)
@@ -151,12 +157,13 @@ def register_annotation_callbacks():
             State('RV-main-graph', 'figure'),
             State('RV-main-graph-resampler', 'data'),
             State('RV-annotation-label', 'value'),
+            State('RV-annotation-label-2', 'value'),
             State({'type': 'color-dropdown', 'label': ALL}, 'value'),
             State({'type': 'color-dropdown', 'label': ALL}, 'id')
         ],
         prevent_initial_call=True
     )
-    def refresh_annotations(refresh_annotations, show_annotation_labels, raw, current_fig, resampler, annotation_label, annotation_colors, annotation_colors_ids):
+    def refresh_annotations(refresh_annotations, show_annotation_labels, raw, current_fig, resampler, annotation_label, annotation_label_2, annotation_colors, annotation_colors_ids):
         """Refreshes RV-main-graph with updated annotations.
         Triggered when hidden RV-refresh-annotations-button is pressed or RV-show-annotation-labels is enabled/disabled.
         """
@@ -175,7 +182,8 @@ def register_annotation_callbacks():
                 new_yaxis_end = current_fig['layout']['yaxis']['range'][1] - (4 * c.DEFAULT_Y_AXIS_OFFSET)
 
             patched_fig['layout']['yaxis']['range'][1] = new_yaxis_end
-            patched_fig['layout']['newshape']['label'] = {'text': annotation_label, 'textposition': 'top center', 'font': {'size': 18, 'color': 'black'}} if show_annotation_labels else {}
+            combined_text = f"{annotation_label} + {annotation_label_2}" if (annotation_label_2 and annotation_label_2 != 'None' and annotation_label_2 != annotation_label) else annotation_label
+            patched_fig['layout']['newshape']['label'] = {'text': combined_text, 'textposition': 'top center', 'font': {'size': 18, 'color': 'black'}} if show_annotation_labels else {}
 
         patched_fig['layout']['shapes'] = []
         for annotation_index in range(len(raw.annotations)):
@@ -418,7 +426,9 @@ def register_annotation_callbacks():
         ],
         [
             Input('RV-annotation-label', 'value'),
-            Input({'type': 'color-dropdown', 'label': ALL}, 'value')
+            Input('RV-annotation-label-2', 'value'),
+            Input({'type': 'color-dropdown', 'label': ALL}, 'value'),
+            Input('RV-active-annotation-label-dropdown', 'value')
         ],
         [
             State('RV-raw', 'data'), State('RV-main-graph-resampler', 'data'),
@@ -427,7 +437,7 @@ def register_annotation_callbacks():
         ],
         prevent_initial_call=True
     )
-    def update_annotation_drawing(selected_annotation_label, annotation_colors, raw, resampler, annotation_colors_ids, show_annotation_labels):
+    def update_annotation_drawing(selected_annotation_label, selected_annotation_label_2, annotation_colors, active_label, raw, resampler, annotation_colors_ids, show_annotation_labels):
         """Updates attributes of annotation-drawing when different annotation label is selected or annotation-label color is changed.
         """
         if resampler is None:
@@ -439,7 +449,12 @@ def register_annotation_callbacks():
         patched_fig = Patch()
         refresh_annotations = no_update
 
-        # Get annotation color of selected label
+        # Use active label from the top menu if provided
+        if active_label:
+            selected_annotation_label = active_label
+
+        # Get annotation color of selected label (fallback red)
+        annotation_color = 'red'
         for index, dropdown in enumerate(annotation_colors_ids):
             if dropdown['label'] == selected_annotation_label:
                 annotation_color = annotation_colors[index]
@@ -448,16 +463,77 @@ def register_annotation_callbacks():
         patched_fig['layout']['newshape']['fillcolor'] = annotation_color if annotation_color != 'hide' else 'red'
         patched_fig['layout']['newshape']['visible'] = True if annotation_color != 'hide' else False
 
-        if 'RV-annotation-label' in trigger:
-            patched_fig['layout']['newshape']['name'] = selected_annotation_label
-            patched_fig['layout']['newshape']['label']['text'] = selected_annotation_label if show_annotation_labels else ''
-
+        # Compute combined name and label text
+        if selected_annotation_label_2 and selected_annotation_label_2 != 'None' and selected_annotation_label_2 != selected_annotation_label:
+            combined_name = f"{selected_annotation_label}|{selected_annotation_label_2}"
+            combined_text = f"{selected_annotation_label} + {selected_annotation_label_2}"
         else:
-            # If color was changed of existing annotation-label, redraw annotations
-            if selected_annotation_label in raw.annotations.description:
-                refresh_annotations = 1
+            combined_name = selected_annotation_label
+            combined_text = selected_annotation_label
+
+        patched_fig['layout']['newshape']['name'] = combined_name
+        patched_fig['layout']['newshape']['label'] = {'text': combined_text, 'textposition': 'top center', 'font': {'size': 18, 'color': 'black'}} if show_annotation_labels else {}
+
+        # If color was changed of existing annotation-label, redraw annotations
+        if (raw is not None) and (selected_annotation_label in raw.annotations.description):
+            refresh_annotations = 1
 
         return patched_fig, refresh_annotations
+
+    @callback(
+        [
+            Output('RV-annotation-label-2', 'options', allow_duplicate=True),
+            Output('RV-annotation-label-2', 'value', allow_duplicate=True)
+        ],
+        Input('RV-annotation-label', 'options'),
+        State('RV-annotation-label-2', 'value'),
+        prevent_initial_call=True
+    )
+    def sync_second_annotation_selector(primary_options, current_second_value):
+        # Mirror available labels (without color dropdowns) to second selector
+        simple_options = [{'label': 'None', 'value': 'None'}]
+        simple_options.extend([{'label': opt['value'], 'value': opt['value']} for opt in primary_options])
+        valid_values = [opt['value'] for opt in simple_options]
+        if (current_second_value is not None) and (current_second_value not in valid_values):
+            current_second_value = None
+        return simple_options, current_second_value
+
+    @callback(
+        [
+            Output('RV-active-annotation-label-dropdown', 'options', allow_duplicate=True),
+            Output('RV-active-annotation-label-dropdown', 'value', allow_duplicate=True),
+        ],
+        [
+            Input('RV-enabled-annotation-labels', 'value'),
+            Input('RV-annotation-label', 'options')
+        ],
+        State('RV-active-annotation-label-dropdown', 'value'),
+        prevent_initial_call=True
+    )
+    def update_active_label_options(enabled_labels, primary_options, current_value):
+        # If nothing checked, default to seizure
+        if not enabled_labels:
+            enabled_labels = ['seizure']
+        # Ensure only labels that exist are offered
+        existing = {opt['value'] for opt in primary_options}
+        filtered = [lbl for lbl in enabled_labels if lbl in existing]
+        if not filtered:
+            filtered = ['seizure']
+        options = [{'label': lbl, 'value': lbl} for lbl in filtered]
+        value = current_value if current_value in filtered else filtered[0]
+        return options, value
+
+    @callback(
+        Output('RV-annotation-label', 'value', allow_duplicate=True),
+        Input('RV-active-annotation-label-dropdown', 'value'),
+        prevent_initial_call=True
+    )
+    def set_active_label_from_menu(active_label):
+        if active_label:
+            return active_label
+        raise PreventUpdate
+
+    # Removed duplicate callback with same outputs; merged logic into update_annotation_drawing above
 
     @callback(
         Output({'type': 'modal', 'modal': 'RV-settings'}, 'is_open', allow_duplicate=True),
